@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "fu.h"
 #include "pipeline.h"
 #include "output.h"
@@ -57,6 +58,8 @@ main(int argc, char *argv[]) {
     execute(state);
     if (!(state->fetch_lock)) {
       decode(state);
+    }
+    if (!(state->fetch_lock)) {
       fetch(state);
     }
   }

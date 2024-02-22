@@ -52,6 +52,7 @@ typedef struct _state_t {
   int scoreboard_fp[NUMREGS];
 
   int_t int_wb_value;
+  float fp_wb_value;
 
   int fetch_lock;
 } state_t;
