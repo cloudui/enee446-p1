@@ -587,25 +587,25 @@ advance_fu_int(fu_int_t *fu_list, wb_t *int_wb) {
       switch (stage->current_cycle) {
 	/* is fu stage free? */
       case -1:
-	break;                                      /* do nothing */
+	      break;                                      /* do nothing */
 
 	/* is fu stage done processing? */
       case 0:
-	if (next_stage == NULL) {                    /* is this the last stage in the fu? */
-	  int_wb->instr = stage->instr;
-	  stage->current_cycle = -1;
-	} else {
-	  if (next_stage->current_cycle == -1) {     /* move to next fu stage */
-	    next_stage->current_cycle = next_stage->num_cycles-1;
-	    next_stage->instr = stage->instr;
-	    stage->current_cycle = -1;
-	  }
-	}
-	break;
+        if (next_stage == NULL) {                    /* is this the last stage in the fu? */
+          int_wb->instr = stage->instr;
+          stage->current_cycle = -1;
+        } else {
+          if (next_stage->current_cycle == -1) {     /* move to next fu stage */
+            next_stage->current_cycle = next_stage->num_cycles-1;
+            next_stage->instr = stage->instr;
+            stage->current_cycle = -1;
+          }
+        }
+        break;
 
 	/*  fu stage is still processing */
       default:
-	stage->current_cycle--;
+	      stage->current_cycle--;
       }
       next_stage = stage;
       stage = stage->prev;
@@ -668,7 +668,7 @@ fu_int_done(fu_int_t *fu_list)
     stage = fu->stage_list;
     while (stage != NULL) {
       if (stage->current_cycle != -1)
-	return FALSE;
+	      return FALSE;
       stage = stage->prev;
     }
     fu = fu->next;
@@ -737,15 +737,61 @@ perform_operation(int instr, unsigned long pc, operand_t operand1,
   switch(op_info->fu_group_num) {
   case FU_GROUP_INT:
     switch(op_info->operation) {
-    case OPERATION_ADD:
-      result.integer.w = operand1.integer.w + operand2.integer.w;
-      break;
+      case OPERATION_ADD:
+        result.integer.w = operand1.integer.w + operand2.integer.w;
+        break;
+      case OPERATION_SUB:
+        result.integer.w = operand1.integer.w - operand2.integer.w;
+        break;
+      case OPERATION_AND:
+        result.integer.w = operand1.integer.w & operand2.integer.w;
+        break;
+      case OPERATION_OR:
+        result.integer.w = operand1.integer.w | operand2.integer.w;
+        break;
+      case OPERATION_XOR:
+        result.integer.w = operand1.integer.w ^ operand2.integer.w;
+        break;
+      case OPERATION_SLL:
+        result.integer.w = operand1.integer.w << operand2.integer.w;
+        break;
+      case OPERATION_SRL:
+        result.integer.w = operand1.integer.w >> operand2.integer.w;
+        break;
+      case OPERATION_SLT:
+        result.integer.w = (operand1.integer.w < operand2.integer.w) ? 1 : 0;
+        break;
+        // check for sltiu? 
+      case OPERATION_SLTU:
+        result.integer.w = (operand1.integer.wu < operand2.integer.wu) ? 1 : 0;
+        break;
+
     }
     break;
 
   case FU_GROUP_ADD:
+    switch(op_info->operation) {
+      case OPERATION_ADD:
+        result.flt = operand1.flt + operand2.flt;
+        break;
+      case OPERATION_SUB:
+        result.flt = operand1.flt - operand2.flt;
+        break;
+    }
+    break;
   case FU_GROUP_MULT:
+    switch(op_info->operation) {
+      case OPERATION_MULT:
+        result.flt = operand1.flt * operand2.flt;
+        break;
+    }
+    break;
   case FU_GROUP_DIV:
+    switch(op_info->operation) {
+      case OPERATION_DIV:
+        result.flt = operand1.flt / operand2.flt;
+        break;
+    }
     break;
 
   case FU_GROUP_MEM:
