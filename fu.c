@@ -751,26 +751,25 @@ perform_operation(int instr, unsigned long pc, operand_t operand1,
         result.integer.w = operand1.integer.w - operand2.integer.w;
         break;
       case OPERATION_AND:
-        result.integer.w = operand1.integer.w & operand2.integer.w;
+        result.integer.wu = operand1.integer.wu & operand2.integer.wu;
         break;
       case OPERATION_OR:
-        result.integer.w = operand1.integer.w | operand2.integer.w;
+        result.integer.wu = operand1.integer.wu | operand2.integer.wu;
         break;
       case OPERATION_XOR:
-        result.integer.w = operand1.integer.w ^ operand2.integer.w;
+        result.integer.wu = operand1.integer.wu ^ operand2.integer.wu;
         break;
       case OPERATION_SLL:
-        result.integer.w = operand1.integer.w << operand2.integer.w;
+        result.integer.wu = operand1.integer.wu << operand2.integer.wu;
         break;
       case OPERATION_SRL:
-        result.integer.w = operand1.integer.w >> operand2.integer.w;
+        result.integer.wu = operand1.integer.wu >> operand2.integer.wu;
         break;
       case OPERATION_SLT:
         result.integer.w = (operand1.integer.w < operand2.integer.w) ? 1 : 0;
         break;
-        // check for sltiu? 
       case OPERATION_SLTU:
-        result.integer.w = (operand1.integer.wu < operand2.integer.wu) ? 1 : 0;
+        result.integer.wu = (operand1.integer.wu < operand2.integer.wu) ? 1 : 0;
         break;
 
     }
