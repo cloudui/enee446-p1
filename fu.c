@@ -138,7 +138,7 @@ const op_level2_t op_imm_table[] = {
   {{"slli",   FU_GROUP_INT,    OPERATION_SLL,  DATA_TYPE_NONE},NULL},
   {{"srli",   FU_GROUP_INT,    OPERATION_SRL,  DATA_TYPE_NONE},NULL},
   {{"slti",   FU_GROUP_INT,    OPERATION_SLT,  DATA_TYPE_NONE},NULL},
-  {{"sltiu",  FU_GROUP_INT,    OPERATION_SLT,  DATA_TYPE_NONE},NULL},
+  {{"sltiu",  FU_GROUP_INT,    OPERATION_SLTU,  DATA_TYPE_NONE},NULL},
 };
 
 const op_level2_t op_load_table[] = {
@@ -387,6 +387,13 @@ state_create(int *data_count, FILE *bin_file, FILE *fu_file) {
   state->fp_wb.instr = 0/*NOP*/;
 
   state->fetch_lock = FALSE;
+
+  /* initialize scoreboard for hazards */
+  i = 0;
+  for (i=0; i<NUMREGS; i++) {
+    state->scoreboard_int[i] = -1;
+    state->scoreboard_fp[i] = -1;
+  }
 
   return state;
 }
@@ -725,7 +732,7 @@ decode_instr(int instr, int *use_imm) {
 
 
 /* perform an instruction */
-void
+operand_t
 perform_operation(int instr, unsigned long pc, operand_t operand1,
 		  operand_t operand2)
 {
@@ -809,5 +816,7 @@ perform_operation(int instr, unsigned long pc, operand_t operand1,
   case FU_GROUP_INVALID:
     fprintf(stderr, "error (perform): invalid opcode (instr = %.8X)\n", instr);
   }
+
+  return result;
 
 }
