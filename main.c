@@ -58,8 +58,6 @@ main(int argc, char *argv[]) {
     execute(state);
     if (!(state->fetch_lock)) {
       decode(state);
-    }
-    if (!(state->fetch_lock)) {
       fetch(state);
     }
   }
