@@ -117,6 +117,7 @@ typedef struct _fu_int_stage_t {
   int num_cycles;
   int current_cycle;
   int instr;
+  operand_t value;
   struct _fu_int_stage_t *prev;
 } fu_int_stage_t;
 
@@ -131,6 +132,7 @@ typedef struct _fu_fp_stage_t {
   int num_cycles;
   int current_cycle;
   int instr;
+  operand_t value;
   struct _fu_fp_stage_t *prev;
 } fu_fp_stage_t;
 
@@ -144,13 +146,14 @@ typedef struct _fu_fp_t {
 /* writeback pipeline register */
 typedef struct _wb_t {
   int instr;
+  operand_t value;
 } wb_t;
 
 
 extern int fu_int_read(fu_int_t **, FILE *);
 extern int fu_fp_read(fu_fp_t **, FILE *);
 
-extern int issue_fu_int(fu_int_t *, int, unsigned long pc);
+extern int issue_fu_int(fu_int_t *, int, operand_t);
 extern int issue_fu_fp(fu_fp_t *, int);
 
 extern void advance_fu_int(fu_int_t *, wb_t *);

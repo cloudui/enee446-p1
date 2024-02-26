@@ -131,6 +131,9 @@ const op_info_t op_table[] = {
 
 char * readAndParse(FILE *, char **, char **, char **, char **, char **, char *);
 int get_label_address(char *);
+int get_data(int, char *, data_t *, int *, int);
+int get_reg(int, char *, int *, int, int);
+int get_val(int, char *, int *, int, int, int, int);
 
 char Labels[MAXNUMLABELS][MAXLABELLENGTH];
 int Addresses[MAXNUMLABELS];

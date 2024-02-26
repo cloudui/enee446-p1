@@ -1,0 +1,7 @@
+*.o
+asm
+rvsim
+asm.dSYM
+*.diff
+*.mc
+simple1

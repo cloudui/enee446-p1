@@ -27,8 +27,7 @@ writeback(state_t *state, int *num_insn) {
   int use_imm;
 
   const op_info_t *op_info = decode_instr(state->if_id.instr, &use_imm);
-
-  if (int_wb.instr != -1) {
+  if (int_wb.instr != -1 && int_wb.instr != 0 && int_wb.instr != NOP) {
     int_t dest_addr;
     // load store value
     operand_t ls_value;
@@ -37,7 +36,7 @@ writeback(state_t *state, int *num_insn) {
     rd = FIELD_RD(int_wb.instr);
     rs1 = FIELD_RS1(int_wb.instr);
     rs2 = FIELD_RS2(int_wb.instr);
-    result = state->int_wb_value; 
+    result = int_wb.value.integer; 
 
     switch (op_info->fu_group_num) {
       case FU_GROUP_INT:
@@ -126,11 +125,11 @@ writeback(state_t *state, int *num_insn) {
     int_wb.instr = -1;
   } 
 
-  if (fp_wb.instr != -1) {
+  if (fp_wb.instr != -1 && fp_wb.instr != 0 && fp_wb.instr != NOP) {
     (*num_insn)++;
 
     rd = FIELD_RD(fp_wb.instr);
-    state->rf_fp.reg_fp[rd] = state->fp_wb_value;
+    state->rf_fp.reg_fp[rd] = fp_wb.value.flt;
     state->scoreboard_fp[rd] = -1;
     fp_wb.instr = -1;
   }
@@ -177,18 +176,10 @@ decode(state_t *state, int *simulate) {
       rs2 = FIELD_RS2(state->if_id.instr);
 
       // If there is a RAW Hazard
-      if (state->scoreboard_int[rs1] != -1 || (use_imm && state->scoreboard_int[rs2] != -1)) {
+      if (state->scoreboard_int[rs1] != -1 || (!use_imm && state->scoreboard_int[rs2] != -1)) {
         state->pc -= 4;
         return 0;
       }
-      // If there is a structural hazard
-      if (issue_fu_int(state->fu_int_list, state->if_id.instr, state->if_id.pc) == -1) {
-        state->pc -= 4;
-        return 0;
-      }
-
-      // Set scoreboard for destination register (can cause RAW hazard if not -1)
-      state->scoreboard_int[rd] = 1;
 
       // Set op1 value
       op1.integer = state->rf_int.reg_int[rs1];
@@ -214,8 +205,14 @@ decode(state_t *state, int *simulate) {
                                 op1, 
                                 op2);
 
-      // Carry value for int writeback 
-      state->int_wb_value = result.integer;
+      // If there is a structural hazard
+      if (issue_fu_int(state->fu_int_list, state->if_id.instr, result) == -1) {
+        state->pc -= 4;
+        return 0;
+      }
+
+      // Set scoreboard for destination register (can cause RAW hazard if not -1)
+      state->scoreboard_int[rd] = 1;
 
       break;
     case FU_GROUP_ADD: case FU_GROUP_MULT: case FU_GROUP_DIV:
@@ -275,7 +272,7 @@ decode(state_t *state, int *simulate) {
       result = perform_operation(state->if_id.instr, state->if_id.pc, op1, op2);
 
       // Carry value for fp writeback
-      state->fp_wb_value = result.flt;
+      // state->fp_wb_value = result.flt;
 
       break;
     case FU_GROUP_MEM:
@@ -283,19 +280,16 @@ decode(state_t *state, int *simulate) {
       rs1 = FIELD_RS1(state->if_id.instr);
       rs2 = FIELD_RS2(state->if_id.instr);
 
-      // If there is a RAW Hazard
-      if (state->scoreboard_int[rs1] != -1 || (use_imm && state->scoreboard_int[rs2] != -1)) {
+      // If there is a RAW Hazard RS1
+      if (state->scoreboard_int[rs1] != -1) {
         state->pc -= 4;
         return 0;
       }
-      // If there is a structural hazard
-      if (issue_fu_int(state->fu_int_list, state->if_id.instr, state->if_id.pc) == -1) {
+      // If there is a RAW Hazard RS2
+      if (op_info->operation == OPERATION_LOAD && state->scoreboard_int[rs2] != -1) {
         state->pc -= 4;
         return 0;
       }
-
-      // Set scoreboard for destination register (can cause RAW hazard if not -1)
-      state->scoreboard_int[rd] = 1;
 
       // Set op1 value
       op1.integer = state->rf_int.reg_int[rs1];
@@ -309,24 +303,41 @@ decode(state_t *state, int *simulate) {
                                 op1, 
                                 op2);
 
-      // Carry value for int writeback 
-      state->int_wb_value = result.integer;
+
+      // If there is a structural hazard
+      if (issue_fu_int(state->fu_int_list, state->if_id.instr, result) == -1) {
+        state->pc -= 4;
+        return 0;
+      }
+
+      // Set scoreboard for destination register (can cause RAW hazard if not -1)
+      state->scoreboard_int[rd] = 1;
 
       break;
     case FU_GROUP_BRANCH:
-      state->fetch_lock = TRUE;
+      rd = FIELD_RD(state->if_id.instr);
+      rs1 = FIELD_RS1(state->if_id.instr);
+      rs2 = FIELD_RS2(state->if_id.instr);
+      // Check for RAW hazard (JALR, BEQ, BNE)
+      switch (op_info->operation) {
+        case OPERATION_JAL:
+          break;
+        case OPERATION_JALR:
+          if (state->scoreboard_int[rs1] != -1) {
+            state->pc -= 4;
+            return 0;
+          }
+          break;
+        case OPERATION_BEQ: case OPERATION_BNE:
+          // Check for RAW hazard
+          if (state->scoreboard_int[rs1] != -1 || 
+              state->scoreboard_int[rs2] != -1) {
+            state->pc -= 4;
+            return 0;
+          }
+          break;
+      }
 
-      // Check for RAW hazard (JALR only)
-      if (op_info->operation == OPERATION_JALR && 
-              state->scoreboard_int[FIELD_RS1(state->if_id.instr)] != -1) {
-        state->pc -= 4;
-        return 0;
-      }
-      // Check for FU structural hazard
-      if (issue_fu_int(state->fu_int_list, state->if_id.instr, state->if_id.pc) == -1) {
-        state->pc -= 4;
-        return 0;
-      }
       // Perform the operation for branch instructions
       switch (op_info->operation) {
         case OPERATION_JAL:
@@ -337,7 +348,6 @@ decode(state_t *state, int *simulate) {
           op2.integer = op2_value;
           
           result = perform_operation(state->if_id.instr, state->if_id.pc, op1, op2);
-          state->int_wb_value = result.integer;
           break;
         case OPERATION_JALR:
           break;
@@ -350,9 +360,16 @@ decode(state_t *state, int *simulate) {
           op2.integer = op2_value;
 
           result = perform_operation(state->if_id.instr, state->if_id.pc, op1, op2);
-          state->int_wb_value = result.integer;
           break;
       }
+      // Check for FU structural hazard
+      if (issue_fu_int(state->fu_int_list, state->if_id.instr, result) == -1) {
+        state->pc -= 4;
+        return 0;
+      }
+
+      state->fetch_lock = TRUE;
+
       break;
     case FU_GROUP_HALT:
       if (!fu_fp_done(state->fu_add_list) || !fu_fp_done(state->fu_mult_list) || 
