@@ -22,16 +22,67 @@ writeback(state_t *state, int *num_insn) {
   wb_t int_wb = state->int_wb;
   wb_t fp_wb = state->fp_wb;
   unsigned int rd;
+  int_t result; 
 
+  int use_imm;
+
+  const op_info_t *op_info = decode_instr(state->if_id.instr, &use_imm);
 
   if (int_wb.instr != -1) {
+    int_t dest_addr;
+    (*num_insn)++;
     rd = FIELD_RD(int_wb.instr);
-    state->rf_int.reg_int[rd] = state->int_wb_value;
-    state->scoreboard_int[rd] = -1;
+    result = state->int_wb_value; 
+
+    switch (op_info->fu_group_num) {
+      case FU_GROUP_INT:
+        state->rf_int.reg_int[rd] = state->int_wb_value;
+        state->scoreboard_int[rd] = -1;
+        
+        break;
+      case FU_GROUP_MEM:
+        break;
+      case FU_GROUP_BRANCH:
+        switch (op_info->operation) {
+          case OPERATION_JAL:
+            state->pc = result.wu;
+            dest_addr.wu = state->pc + 4;
+            state->rf_int.reg_int[rd] = dest_addr;
+            break;
+          case OPERATION_JALR:
+            state->pc = state->rf_int.reg_int[FIELD_RS1(int_wb.instr)].wu;
+            dest_addr.wu = state->pc + 4;
+            state->rf_int.reg_int[rd] = dest_addr;
+            break;
+          case OPERATION_BEQ:
+            if (state->rf_int.reg_int[FIELD_RS1(int_wb.instr)].wu == state->rf_int.reg_int[FIELD_RS2(int_wb.instr)].wu) {
+              state->pc = result.wu;
+            }              
+            break;
+          case OPERATION_BNE:
+            if (state->rf_int.reg_int[FIELD_RS1(int_wb.instr)].wu != state->rf_int.reg_int[FIELD_RS2(int_wb.instr)].wu) {
+              state->pc = result.wu;
+            }      
+            break;
+        }
+        
+        // Start fetching again after branch logic
+        state->fetch_lock = FALSE;
+
+        break;
+      case FU_GROUP_HALT:
+        break;
+      case FU_GROUP_NONE: case FU_GROUP_INVALID: 
+        fprintf(stderr, "error (perform): invalid opcode");
+        break;
+    }
+    
     int_wb.instr = -1;
   } 
 
   if (fp_wb.instr != -1) {
+    (*num_insn)++;
+
     rd = FIELD_RD(fp_wb.instr);
     state->rf_fp.reg_fp[rd] = state->fp_wb_value;
     state->scoreboard_fp[rd] = -1;
@@ -64,7 +115,7 @@ decode(state_t *state) {
   const op_info_t *op_info = decode_instr(state->if_id.instr, &use_imm);
   operand_t result, op1, op2;  
   unsigned int rd, rs1, rs2;
-  int_t op2_value;
+  int_t op1_value, op2_value;
 
 
   switch (op_info->fu_group_num) {
@@ -179,7 +230,43 @@ decode(state_t *state) {
       state->fp_wb_value = result.flt;
 
       break;
+    case FU_GROUP_MEM:
 
+      break;
+    case FU_GROUP_BRANCH:
+      state->fetch_lock = TRUE;
+
+      switch (op_info->operation) {
+        case OPERATION_JAL:
+          op1_value.w = state->pc;
+          op1.integer = op1_value;
+
+          op2_value.w = FIELD_OFFSET(state->if_id.instr);
+          op2.integer = op2_value;
+          
+          result = perform_operation(state->if_id.instr, state->if_id.pc, op1, op2);
+          state->int_wb_value = result.integer;
+          break;
+        case OPERATION_JALR:
+          break;
+        case OPERATION_BEQ: case OPERATION_BNE:
+          op1_value.w = state->pc;
+          op1.integer = op1_value;
+
+          // not sure if signed
+          op2_value.w = FIELD_IMM_I(state->if_id.instr);
+          op2.integer = op2_value;
+
+          result = perform_operation(state->if_id.instr, state->if_id.pc, op1, op2);
+          state->int_wb_value = result.integer;
+          break;
+      }
+      break;
+    case FU_GROUP_HALT:
+      
+      break;
+    case FU_GROUP_NONE: case FU_GROUP_INVALID:
+      break;
   }
 
   

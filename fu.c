@@ -804,6 +804,7 @@ perform_operation(int instr, unsigned long pc, operand_t operand1,
     break;
 
   case FU_GROUP_BRANCH:
+    result.integer.wu = operand1.integer.wu + operand2.integer.wu;
     break;
 
   case FU_GROUP_HALT:
