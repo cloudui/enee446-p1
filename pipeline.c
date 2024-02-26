@@ -139,12 +139,13 @@ writeback(state_t *state, int *num_insn) {
 
 void
 execute(state_t *state) {
+  int i;
   advance_fu_fp(state->fu_add_list, &state->fp_wb);
   advance_fu_fp(state->fu_mult_list, &state->fp_wb);
   advance_fu_fp(state->fu_div_list, &state->fp_wb);
   advance_fu_int(state->fu_int_list, &state->int_wb);
 
-  for (int i = 0; i < NUMREGS; i++) {
+  for (i=0; i < NUMREGS; i++) {
     if (state->scoreboard_int[i] != -1) {
       state->scoreboard_int[i]--;
     }
@@ -157,6 +158,7 @@ execute(state_t *state) {
 
 int
 decode(state_t *state, int *simulate) {
+  int i;
   int use_imm;
   const op_info_t *op_info = decode_instr(state->if_id.instr, &use_imm);
   operand_t result, op1, op2;  
@@ -251,7 +253,7 @@ decode(state_t *state, int *simulate) {
       }
 
       // Check for writeback structural hazard
-      for (int i = 0; i < NUMREGS; i++) {
+      for (i=0; i < NUMREGS; i++) {
         if (state->scoreboard_fp[i] == num_cycles) {
           state->pc -= 4;
           return 0;
