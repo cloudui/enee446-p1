@@ -33,6 +33,7 @@ static int wbpf = -1;
 int
 main(int argc, char *argv[]) {
   state_t *state;
+  int simulate = TRUE;
   int data_count;
   int num_insn, i;
 
@@ -49,7 +50,7 @@ main(int argc, char *argv[]) {
   fclose(fu_file);
 
   /* main sim loop */
-  for (i = 0, num_insn = 0; TRUE; i++) {
+  for (i = 0, num_insn = 0; simulate; i++) {
 
     printf("\n\n*** CYCLE %d\n", i);
     print_state(state, data_count);
@@ -57,7 +58,7 @@ main(int argc, char *argv[]) {
     writeback(state, &num_insn);
     execute(state);
     if (!(state->fetch_lock)) {
-      decode(state);
+      decode(state, &simulate);
       fetch(state);
     }
   }

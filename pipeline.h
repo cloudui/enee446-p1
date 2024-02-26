@@ -61,5 +61,5 @@ extern state_t *state_create(int *, FILE *, FILE *);
 
 extern void writeback(state_t *, int *);
 extern void execute(state_t *);
-extern int decode(state_t *);
+extern int decode(state_t *, int *);
 extern void fetch(state_t *);

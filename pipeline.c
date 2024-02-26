@@ -156,7 +156,7 @@ execute(state_t *state) {
 
 
 int
-decode(state_t *state) {
+decode(state_t *state, int *simulate) {
   int use_imm;
   const op_info_t *op_info = decode_instr(state->if_id.instr, &use_imm);
   operand_t result, op1, op2;  
@@ -353,6 +353,12 @@ decode(state_t *state) {
       }
       break;
     case FU_GROUP_HALT:
+      if (!fu_fp_done(state->fu_add_list) || !fu_fp_done(state->fu_mult_list) || 
+          !fu_fp_done(state->fu_div_list) || !fu_int_done(state->fu_int_list)) {
+        state->pc -= 4;
+        return 0;
+      } 
+      *simulate = FALSE;
       break;
     case FU_GROUP_NONE: case FU_GROUP_INVALID:
       return -1;
