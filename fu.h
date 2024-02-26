@@ -102,8 +102,8 @@ extern const char fu_group_div_name[];
 
 /* union to handle multiple fixed-point types */
 typedef union _int_t {
-  signed long w;
-  unsigned long wu;
+  signed int w;
+  unsigned int wu;
 } int_t;
 
 typedef union _operand_t {
