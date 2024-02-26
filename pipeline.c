@@ -26,7 +26,7 @@ writeback(state_t *state, int *num_insn) {
 
   int use_imm;
 
-  const op_info_t *op_info = decode_instr(state->if_id.instr, &use_imm);
+  const op_info_t *op_info = decode_instr(int_wb.instr, &use_imm);
   if (int_wb.instr != -1 && int_wb.instr != 0 && int_wb.instr != NOP) {
     int_t dest_addr;
     // load store value
@@ -40,15 +40,19 @@ writeback(state_t *state, int *num_insn) {
 
     switch (op_info->fu_group_num) {
       case FU_GROUP_INT:
+        // printf("INT WRITEBACK\n");
         state->rf_int.reg_int[rd] = result;
         state->scoreboard_int[rd] = -1;
         
         break;
       case FU_GROUP_MEM:
+        // printf("MEM WRITEBACK\n");
         switch (op_info->operation) {
           case OPERATION_LOAD:
+            ls_loc = result.w;
+            // printf("Load from location: %d with value %d\n", result.w, state->mem[ls_loc] | (state->mem[ls_loc+1] << 8) |
+                      // (state->mem[ls_loc+2] << 16) | (state->mem[ls_loc+3] << 24));
             switch (op_info->data_type) {
-              ls_loc = result.w;
               case DATA_TYPE_W:
                 ls_value.integer.w = state->mem[ls_loc] | (state->mem[ls_loc+1] << 8) |
                                     (state->mem[ls_loc+2] << 16) | (state->mem[ls_loc+3] << 24);
@@ -83,7 +87,6 @@ writeback(state_t *state, int *num_insn) {
 
             break;
         }
-        state->scoreboard_int[rd] = -1;
         break;
       case FU_GROUP_BRANCH:
         switch (op_info->operation) {
@@ -294,7 +297,14 @@ decode(state_t *state, int *simulate) {
       // Set op1 value
       op1.integer = state->rf_int.reg_int[rs1];
       // Set op2 value, immediate
-      op2_value.w = FIELD_IMM_S(state->if_id.instr);
+      switch (op_info->operation) {
+        case OPERATION_LOAD:
+          op2_value.w = FIELD_IMM_I(state->if_id.instr);
+          break;
+        case OPERATION_STORE:
+          op2_value.w = FIELD_IMM_S(state->if_id.instr);
+          break;
+      }
       op2.integer = op2_value;
 
       // Perform the operation
@@ -311,7 +321,9 @@ decode(state_t *state, int *simulate) {
       }
 
       // Set scoreboard for destination register (can cause RAW hazard if not -1)
-      state->scoreboard_int[rd] = 1;
+      if (op_info->operation == OPERATION_LOAD) {
+        state->scoreboard_int[rd] = 1;
+      } 
 
       break;
     case FU_GROUP_BRANCH:

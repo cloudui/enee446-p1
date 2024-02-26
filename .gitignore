@@ -5,3 +5,4 @@ asm.dSYM
 *.diff
 *.mc
 simple1
+*.test
