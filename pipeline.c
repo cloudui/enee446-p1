@@ -294,7 +294,7 @@ decode(state_t *state, int *simulate) {
         return 0;
       }
       // If there is a RAW Hazard RS2
-      if (op_info->operation == OPERATION_LOAD && state->scoreboard_int[rs2] != -1) {
+      if (op_info->operation == OPERATION_STORE && state->scoreboard_int[rs2] != -1) {
         state->pc -= 4;
         return 0;
       }
