@@ -13,6 +13,7 @@
 #include "fu.h"
 #include "pipeline.h"
 
+#define INT_CYCLES 2
 #define ADD_CYCLES 3
 #define MULT_CYCLES 4
 #define DIV_CYCLES 8
@@ -27,7 +28,7 @@ writeback(state_t *state, int *num_insn) {
   int use_imm;
 
   const op_info_t *op_info = decode_instr(int_wb.instr, &use_imm);
-  if (int_wb.instr != -1 && int_wb.instr != 0 && int_wb.instr != NOP) {
+  if (int_wb.instr != 0 && int_wb.instr != NOP) {
     int_t dest_addr;
     // load store value
     operand_t ls_value;
@@ -64,6 +65,7 @@ writeback(state_t *state, int *num_insn) {
                 state->rf_fp.reg_fp[rd] = ls_value.flt;
                 break;
             }
+            // printf("Reset scoreboard for rd: %d\n", rd);
             state->scoreboard_int[rd] = -1;
             break;
           case OPERATION_STORE:
@@ -125,16 +127,16 @@ writeback(state_t *state, int *num_insn) {
         break;
     }
     
-    int_wb.instr = -1;
+    state->int_wb.instr = 0;
   } 
 
-  if (fp_wb.instr != -1 && fp_wb.instr != 0 && fp_wb.instr != NOP) {
+  if (fp_wb.instr != 0 && fp_wb.instr != NOP) {
     (*num_insn)++;
 
     rd = FIELD_RD(fp_wb.instr);
     state->rf_fp.reg_fp[rd] = fp_wb.value.flt;
     state->scoreboard_fp[rd] = -1;
-    fp_wb.instr = -1;
+    state->fp_wb.instr = 0;
   }
 }
 
@@ -179,6 +181,9 @@ decode(state_t *state, int *simulate) {
       rs2 = FIELD_RS2(state->if_id.instr);
 
       // If there is a RAW Hazard
+      // printf("INT use_imm: %d\n", use_imm);
+      // printf("INT rs2: %d\n", rs2);
+      // printf("INT rs2 scoreboard: %d\n", state->scoreboard_int[rs2]);
       if (state->scoreboard_int[rs1] != -1 || (!use_imm && state->scoreboard_int[rs2] != -1)) {
         state->pc -= 4;
         return 0;
@@ -215,7 +220,7 @@ decode(state_t *state, int *simulate) {
       }
 
       // Set scoreboard for destination register (can cause RAW hazard if not -1)
-      state->scoreboard_int[rd] = 1;
+      state->scoreboard_int[rd] = INT_CYCLES;
 
       break;
     case FU_GROUP_ADD: case FU_GROUP_MULT: case FU_GROUP_DIV:
@@ -322,7 +327,8 @@ decode(state_t *state, int *simulate) {
 
       // Set scoreboard for destination register (can cause RAW hazard if not -1)
       if (op_info->operation == OPERATION_LOAD) {
-        state->scoreboard_int[rd] = 1;
+        // printf("HERE with rd value: %d\n", rd);
+        state->scoreboard_int[rd] = INT_CYCLES;
       } 
 
       break;
@@ -402,9 +408,17 @@ decode(state_t *state, int *simulate) {
 
 void
 fetch(state_t *state) {
+  // int i = 0;
+  // printf("Scoreboard:\n");
+  // for (i = 0; i < NUMREGS; i++) {
+  //   printf("%d, ", state->scoreboard_int[i]);
+  // }
+
   state->if_id.instr = state->mem[state->pc] | (state->mem[state->pc+1] << 8) |
     (state->mem[state->pc+2] << 16) | (state->mem[state->pc+3] << 24);
   state->if_id.pc = state->pc;
   state->pc += 4;
+
+  
 }
 
