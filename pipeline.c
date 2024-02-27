@@ -34,6 +34,7 @@ writeback(state_t *state, int *num_insn) {
     int_t dest_addr;
     // load store value
     operand_t ls_value;
+    float *store_float;
     int ls_loc; 
     (*num_insn)++;
     rd = FIELD_RD(int_wb.instr);
@@ -62,8 +63,8 @@ writeback(state_t *state, int *num_insn) {
                 state->rf_int.reg_int[rd] = ls_value.integer;
                 break;
               case DATA_TYPE_F:
-                ls_value.flt = state->mem[ls_loc] | (state->mem[ls_loc+1] << 8) |
-                                    (state->mem[ls_loc+2] << 16) | (state->mem[ls_loc+3] << 24);
+                store_float = (float *) &(state->mem[ls_loc]);
+                ls_value.flt = *store_float;
                 state->rf_fp.reg_fp[rd] = ls_value.flt;
                 break;
             }
@@ -278,9 +279,25 @@ decode(state_t *state) {
       // Carry value for fp writeback
       // state->fp_wb_value = result.flt;
 
-      if (issue_fu_fp(state->fu_add_list, state->if_id.instr, result) == -1) {
-        state->pc -= 4;
-        return 0;
+      switch (op_info->fu_group_num) {
+        case FU_GROUP_ADD:
+          if (issue_fu_fp(state->fu_add_list, state->if_id.instr, result) == -1) {
+            state->pc -= 4;
+            return 0;
+          }
+          break;
+        case FU_GROUP_MULT:
+          if (issue_fu_fp(state->fu_mult_list, state->if_id.instr, result) == -1) {
+            state->pc -= 4;
+            return 0;
+          }
+          break;
+        case FU_GROUP_DIV:
+          if (issue_fu_fp(state->fu_div_list, state->if_id.instr, result) == -1) {
+            state->pc -= 4;
+            return 0;
+          }
+          break;
       }
 
       // Set scoreboard for destination register
@@ -332,7 +349,14 @@ decode(state_t *state) {
       // Set scoreboard for destination register (can cause RAW hazard if not -1)
       if (op_info->operation == OPERATION_LOAD) {
         // printf("HERE with rd value: %d\n", rd);
-        state->scoreboard_int[rd] = INT_CYCLES;
+        switch (op_info->data_type) {
+          case DATA_TYPE_W:
+            state->scoreboard_int[rd] = INT_CYCLES;
+            break;
+          case DATA_TYPE_F:
+            state->scoreboard_fp[rd] = INT_CYCLES;
+            break;
+        }
       } 
 
       break;
