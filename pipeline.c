@@ -269,7 +269,6 @@ decode(state_t *state) {
       }
 
       // Check for FU structural hazard
-      
 
       // Get result
       op1.flt = state->rf_fp.reg_fp[rs1];
@@ -309,16 +308,55 @@ decode(state_t *state) {
       rs1 = FIELD_RS1(state->if_id.instr);
       rs2 = FIELD_RS2(state->if_id.instr);
 
-      // If there is a RAW Hazard RS1
+      // If there is a RAW Hazard RS1, applies to all memory instructions
       if (state->scoreboard_int[rs1] != -1) {
         state->pc -= 4;
         return 0;
       }
-      // If there is a RAW Hazard RS2
-      if (op_info->operation == OPERATION_STORE && state->scoreboard_int[rs2] != -1) {
-        state->pc -= 4;
-        return 0;
+
+      // Dealing with hazards
+      switch (op_info->operation) {
+        case OPERATION_STORE:
+          switch (op_info->data_type) {
+          case DATA_TYPE_W:
+            // RAW Hazard RS2 (STORE ONLY)
+            if (state->scoreboard_int[rs2] != -1) {
+              state->pc -= 4;
+              return 0;
+            }
+            break;
+          case DATA_TYPE_F:
+            // RAW Hazard RS2 (STORE ONLY)
+            if (state->scoreboard_fp[rs2] != -1) {
+              state->pc -= 4;
+              return 0;
+            }
+            break;
+        }
+        // end switch
+          break;
+        case OPERATION_LOAD:
+          if (op_info->data_type == DATA_TYPE_F) {
+            int num_cycles = INT_CYCLES;
+            int rem_cycles = state->scoreboard_fp[rd];
+            // WAW Hazard
+            if (num_cycles <= rem_cycles) {
+              state->pc -= 4;
+              return 0;
+            }
+
+            // Writeback structural hazard
+            for (i=0; i < NUMREGS; i++) {
+              if (state->scoreboard_fp[i] == num_cycles) {
+                state->pc -= 4;
+                return 0;
+              }
+            }
+          }
+
+          break;
       }
+
 
       // Set op1 value
       op1.integer = state->rf_int.reg_int[rs1];
