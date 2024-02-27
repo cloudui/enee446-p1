@@ -9,7 +9,6 @@
 #define TRUE 1
 #define FALSE 0
 
-
 /* fetch/decode pipeline register */
 typedef struct _if_id_t {
   int instr;

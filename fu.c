@@ -540,7 +540,7 @@ fu_fp_read(fu_fp_t **fu_fp_list,FILE *file) {
 
 /* Functions to allocate functional units */
 int
-issue_fu_int(fu_int_t *fu_list, int instr, operand_t value) {
+issue_fu_int(fu_int_t *fu_list, int instr, carry_wb_t carry_wb) {
   fu_int_t *fu;
   fu_int_stage_t *stage;
 
@@ -552,7 +552,7 @@ issue_fu_int(fu_int_t *fu_list, int instr, operand_t value) {
     if (stage->current_cycle == -1) {
       stage->current_cycle = stage->num_cycles-1;
       stage->instr = instr;
-      stage->value = value;
+      stage->carry_wb = carry_wb;
       return 0;
     }
     fu = fu->next;
@@ -562,7 +562,7 @@ issue_fu_int(fu_int_t *fu_list, int instr, operand_t value) {
 
 
 int
-issue_fu_fp(fu_fp_t *fu_list, int instr, operand_t value) {
+issue_fu_fp(fu_fp_t *fu_list, int instr, carry_wb_t carry_wb) {
   fu_fp_t *fu;
   fu_fp_stage_t *stage;
 
@@ -574,7 +574,7 @@ issue_fu_fp(fu_fp_t *fu_list, int instr, operand_t value) {
     if (stage->current_cycle == -1) {
       stage->current_cycle = stage->num_cycles-1;
       stage->instr = instr;
-      stage->value = value;
+      stage->carry_wb = carry_wb;
       return 0;
     }
     fu = fu->next;
@@ -604,13 +604,13 @@ advance_fu_int(fu_int_t *fu_list, wb_t *int_wb) {
       case 0:
         if (next_stage == NULL) {                    /* is this the last stage in the fu? */
           int_wb->instr = stage->instr;
-          int_wb->value = stage->value;
+          int_wb->carry_wb = stage->carry_wb;
           stage->current_cycle = -1;
         } else {
           if (next_stage->current_cycle == -1) {     /* move to next fu stage */
             next_stage->current_cycle = next_stage->num_cycles-1;
             next_stage->instr = stage->instr;
-            next_stage->value = stage->value;
+            next_stage->carry_wb = stage->carry_wb;
             stage->current_cycle = -1;
           }
         }
@@ -648,13 +648,13 @@ advance_fu_fp(fu_fp_t *fu_list, wb_t *fp_wb) {
       case 0:
         if(next_stage == NULL) {                  /* is this the last stage in the fu? */
           fp_wb->instr = stage->instr;
-          fp_wb->value = stage->value;
+          fp_wb->carry_wb = stage->carry_wb;
           stage->current_cycle = -1;
         } else {
           if(next_stage->current_cycle == -1) {                                  /* move to next fu stage */
             next_stage->current_cycle = next_stage->num_cycles-1;
             next_stage->instr = stage->instr;
-            next_stage->value = stage->value;
+            next_stage->carry_wb = stage->carry_wb;
             stage->current_cycle = -1;
           }
         }

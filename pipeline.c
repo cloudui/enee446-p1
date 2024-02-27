@@ -23,7 +23,9 @@ writeback(state_t *state, int *num_insn) {
   wb_t int_wb = state->int_wb;
   wb_t fp_wb = state->fp_wb;
   unsigned int rd, rs1, rs2;
-  int_t result; 
+
+  unsigned int addr;
+  unsigned int cond; 
 
   int use_imm;
 
@@ -36,17 +38,22 @@ writeback(state_t *state, int *num_insn) {
     operand_t ls_value;
     float *store_float;
     int ls_loc; 
-    (*num_insn)++;
+    int_t value;
+
+    
     rd = FIELD_RD(int_wb.instr);
     rs1 = FIELD_RS1(int_wb.instr);
     rs2 = FIELD_RS2(int_wb.instr);
-    result = int_wb.value.integer; 
+    value = int_wb.carry_wb.value.integer; 
+    addr = int_wb.carry_wb.addr;
+    cond = int_wb.carry_wb.cond;
 
+    (*num_insn)++;
     switch (op_info->fu_group_num) {
       case FU_GROUP_INT:
         // printf("INT WRITEBACK\n");
         if (rd != 0) {
-          state->rf_int.reg_int[rd] = result;
+          state->rf_int.reg_int[rd] = value;
         }
         
         state->scoreboard_int[rd] = -1;
@@ -56,7 +63,7 @@ writeback(state_t *state, int *num_insn) {
         // printf("MEM WRITEBACK\n");
         switch (op_info->operation) {
           case OPERATION_LOAD:
-            ls_loc = result.w;
+            ls_loc = addr;
             // printf("Load from location: %d with value %d\n", result.w, state->mem[ls_loc] | (state->mem[ls_loc+1] << 8) |
                       // (state->mem[ls_loc+2] << 16) | (state->mem[ls_loc+3] << 24));
             switch (op_info->data_type) {
@@ -77,17 +84,17 @@ writeback(state_t *state, int *num_insn) {
             state->scoreboard_int[rd] = -1;
             break;
           case OPERATION_STORE:
-            ls_loc = result.w;
+            ls_loc = addr;
             switch (op_info->data_type) {
               case DATA_TYPE_W:
-                ls_value.integer = state->rf_int.reg_int[rs2];
+                ls_value.integer = value;
                 state->mem[ls_loc] = ls_value.integer.w & 0xFF;
                 state->mem[ls_loc+1] = (ls_value.integer.w >> 8) & 0xFF;
                 state->mem[ls_loc+2] = (ls_value.integer.w >> 16) & 0xFF;
                 state->mem[ls_loc+3] = (ls_value.integer.w >> 24) & 0xFF;
                 break;
               case DATA_TYPE_F:
-                ls_value.flt = state->rf_fp.reg_fp[rs2];
+                ls_value.flt = state->int_wb.carry_wb.value.flt;
                 state->mem[ls_loc] = ls_value.integer.w & 0xFF;
                 state->mem[ls_loc+1] = (ls_value.integer.w >> 8) & 0xFF;
                 state->mem[ls_loc+2] = (ls_value.integer.w >> 16) & 0xFF;
@@ -101,7 +108,7 @@ writeback(state_t *state, int *num_insn) {
       case FU_GROUP_BRANCH:
         switch (op_info->operation) {
           case OPERATION_JAL:
-            state->pc = result.wu;
+            state->pc = addr;
             dest_addr.wu = state->pc + 4;
             if (rd != 0) {
               state->rf_int.reg_int[rd] = dest_addr;
@@ -110,7 +117,7 @@ writeback(state_t *state, int *num_insn) {
             state->if_id.instr = NOP;
             break;
           case OPERATION_JALR:
-            state->pc = state->rf_int.reg_int[FIELD_RS1(int_wb.instr)].wu;
+            state->pc = value.wu;
             dest_addr.wu = state->pc + 4;
             if (rd != 0) {
               state->rf_int.reg_int[rd] = dest_addr;
@@ -119,15 +126,15 @@ writeback(state_t *state, int *num_insn) {
             state->if_id.instr = NOP;
             break;
           case OPERATION_BEQ:
-            if (state->rf_int.reg_int[FIELD_RS1(int_wb.instr)].wu == state->rf_int.reg_int[FIELD_RS2(int_wb.instr)].wu) {
-              state->pc = result.wu;
+            if (cond) {
+              state->pc = addr;
               // clear fetched instruction
               state->if_id.instr = NOP;
             }              
             break;
           case OPERATION_BNE:
-            if (state->rf_int.reg_int[FIELD_RS1(int_wb.instr)].wu != state->rf_int.reg_int[FIELD_RS2(int_wb.instr)].wu) {
-              state->pc = result.wu;
+            if (cond) {
+              state->pc = addr;
               // clear fetched instruction
               state->if_id.instr = NOP;
             }      
@@ -152,7 +159,7 @@ writeback(state_t *state, int *num_insn) {
     (*num_insn)++;
 
     rd = FIELD_RD(fp_wb.instr);
-    state->rf_fp.reg_fp[rd] = fp_wb.value.flt;
+    state->rf_fp.reg_fp[rd] = fp_wb.carry_wb.value.flt;
     state->scoreboard_fp[rd] = -1;
     state->fp_wb.instr = 0;
   }
@@ -186,6 +193,11 @@ decode(state_t *state) {
   operand_t result, op1, op2;  
   unsigned int rd, rs1, rs2;
   int_t op1_value, op2_value;
+  operand_t mem_value;
+
+  // WB variables
+  carry_wb_t carry_wb;
+  operand_t val; 
 
   if (state->if_id.instr == NOP) {
     return 0;
@@ -231,8 +243,9 @@ decode(state_t *state) {
                                 op1, 
                                 op2);
 
+      carry_wb.value = result;
       // If there is a structural hazard
-      if (issue_fu_int(state->fu_int_list, state->if_id.instr, result) == -1) {
+      if (issue_fu_int(state->fu_int_list, state->if_id.instr, carry_wb) == -1) {
         state->pc -= 4;
         return 0;
       }
@@ -293,21 +306,24 @@ decode(state_t *state) {
       // Carry value for fp writeback
       // state->fp_wb_value = result.flt;
 
+      // Set carry WB
+      carry_wb.value = result;
+
       switch (op_info->fu_group_num) {
         case FU_GROUP_ADD:
-          if (issue_fu_fp(state->fu_add_list, state->if_id.instr, result) == -1) {
+          if (issue_fu_fp(state->fu_add_list, state->if_id.instr, carry_wb) == -1) {
             state->pc -= 4;
             return 0;
           }
           break;
         case FU_GROUP_MULT:
-          if (issue_fu_fp(state->fu_mult_list, state->if_id.instr, result) == -1) {
+          if (issue_fu_fp(state->fu_mult_list, state->if_id.instr, carry_wb) == -1) {
             state->pc -= 4;
             return 0;
           }
           break;
         case FU_GROUP_DIV:
-          if (issue_fu_fp(state->fu_div_list, state->if_id.instr, result) == -1) {
+          if (issue_fu_fp(state->fu_div_list, state->if_id.instr, carry_wb) == -1) {
             state->pc -= 4;
             return 0;
           }
@@ -379,9 +395,22 @@ decode(state_t *state) {
       switch (op_info->operation) {
         case OPERATION_LOAD:
           op2_value.w = FIELD_IMM_I(state->if_id.instr);
+
           break;
+
         case OPERATION_STORE:
           op2_value.w = FIELD_IMM_S(state->if_id.instr);
+
+          switch (op_info->data_type) {
+            case DATA_TYPE_W:
+              mem_value.integer = state->rf_int.reg_int[rs2];
+              carry_wb.value = mem_value;
+              break;
+            case DATA_TYPE_F:
+              mem_value.flt = state->rf_fp.reg_fp[rs2];
+              carry_wb.value = mem_value;
+              break;
+          }
           break;
       }
       op2.integer = op2_value;
@@ -392,9 +421,9 @@ decode(state_t *state) {
                                 op1, 
                                 op2);
 
-
+      carry_wb.addr = result.integer.wu;
       // If there is a structural hazard
-      if (issue_fu_int(state->fu_int_list, state->if_id.instr, result) == -1) {
+      if (issue_fu_int(state->fu_int_list, state->if_id.instr, carry_wb) == -1) {
         state->pc -= 4;
         return 0;
       }
@@ -449,6 +478,8 @@ decode(state_t *state) {
           result = perform_operation(state->if_id.instr, state->if_id.pc, op1, op2);
           break;
         case OPERATION_JALR:
+          val.integer = state->rf_int.reg_int[rs1];
+          carry_wb.value = val;
           break;
         case OPERATION_BEQ: case OPERATION_BNE:
           op1_value.w = state->if_id.pc;
@@ -461,10 +492,20 @@ decode(state_t *state) {
           result = perform_operation(state->if_id.instr, state->if_id.pc, op1, op2);
           // printf("op1: %d, op2: %d\n", op1.integer.w, op2.integer.w);
           // printf("result: %d\n", result.integer.w);
+          switch (op_info->operation) {
+            case OPERATION_BEQ:
+              carry_wb.cond = (state->rf_int.reg_int[rs1].wu == state->rf_int.reg_int[rs2].wu);
+              break;
+            case OPERATION_BNE:
+              carry_wb.cond = (state->rf_int.reg_int[rs1].wu != state->rf_int.reg_int[rs2].wu);
+              break;
+          }
           break;
       }
+
+      carry_wb.addr = result.integer.wu;
       // Check for FU structural hazard
-      if (issue_fu_int(state->fu_int_list, state->if_id.instr, result) == -1) {
+      if (issue_fu_int(state->fu_int_list, state->if_id.instr, carry_wb) == -1) {
         state->pc -= 4;
         return 0;
       }
