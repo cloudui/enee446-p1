@@ -268,13 +268,7 @@ decode(state_t *state) {
       }
 
       // Check for FU structural hazard
-      if (issue_fu_fp(state->fu_add_list, state->if_id.instr) == -1) {
-        state->pc -= 4;
-        return 0;
-      }
-
-      // Set scoreboard for destination register
-      state->scoreboard_fp[rd] = num_cycles;
+      
 
       // Get result
       op1.flt = state->rf_fp.reg_fp[rs1];
@@ -283,6 +277,14 @@ decode(state_t *state) {
 
       // Carry value for fp writeback
       // state->fp_wb_value = result.flt;
+
+      if (issue_fu_fp(state->fu_add_list, state->if_id.instr, result) == -1) {
+        state->pc -= 4;
+        return 0;
+      }
+
+      // Set scoreboard for destination register
+      state->scoreboard_fp[rd] = num_cycles;
 
       break;
     case FU_GROUP_MEM:

@@ -154,7 +154,7 @@ extern int fu_int_read(fu_int_t **, FILE *);
 extern int fu_fp_read(fu_fp_t **, FILE *);
 
 extern int issue_fu_int(fu_int_t *, int, operand_t);
-extern int issue_fu_fp(fu_fp_t *, int);
+extern int issue_fu_fp(fu_fp_t *, int, operand_t);
 
 extern void advance_fu_int(fu_int_t *, wb_t *);
 extern void advance_fu_fp(fu_fp_t *, wb_t *);
