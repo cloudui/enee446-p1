@@ -45,7 +45,10 @@ writeback(state_t *state, int *num_insn) {
     switch (op_info->fu_group_num) {
       case FU_GROUP_INT:
         // printf("INT WRITEBACK\n");
-        state->rf_int.reg_int[rd] = result;
+        if (rd != 0) {
+          state->rf_int.reg_int[rd] = result;
+        }
+        
         state->scoreboard_int[rd] = -1;
         
         break;
@@ -60,7 +63,9 @@ writeback(state_t *state, int *num_insn) {
               case DATA_TYPE_W:
                 ls_value.integer.w = state->mem[ls_loc] | (state->mem[ls_loc+1] << 8) |
                                     (state->mem[ls_loc+2] << 16) | (state->mem[ls_loc+3] << 24);
-                state->rf_int.reg_int[rd] = ls_value.integer;
+                if (rd != 0) {
+                  state->rf_int.reg_int[rd] = ls_value.integer;
+                }
                 break;
               case DATA_TYPE_F:
                 store_float = (float *) &(state->mem[ls_loc]);
@@ -98,22 +103,32 @@ writeback(state_t *state, int *num_insn) {
           case OPERATION_JAL:
             state->pc = result.wu;
             dest_addr.wu = state->pc + 4;
-            state->rf_int.reg_int[rd] = dest_addr;
+            if (rd != 0) {
+              state->rf_int.reg_int[rd] = dest_addr;
+            }
+            // clear fetched instruction
+            state->if_id.instr = NOP;
             break;
           case OPERATION_JALR:
             state->pc = state->rf_int.reg_int[FIELD_RS1(int_wb.instr)].wu;
             dest_addr.wu = state->pc + 4;
-            state->rf_int.reg_int[rd] = dest_addr;
+            if (rd != 0) {
+              state->rf_int.reg_int[rd] = dest_addr;
+            }
+            // clear fetched instruction
+            state->if_id.instr = NOP;
             break;
           case OPERATION_BEQ:
             if (state->rf_int.reg_int[FIELD_RS1(int_wb.instr)].wu == state->rf_int.reg_int[FIELD_RS2(int_wb.instr)].wu) {
               state->pc = result.wu;
+              // clear fetched instruction
               state->if_id.instr = NOP;
             }              
             break;
           case OPERATION_BNE:
             if (state->rf_int.reg_int[FIELD_RS1(int_wb.instr)].wu != state->rf_int.reg_int[FIELD_RS2(int_wb.instr)].wu) {
               state->pc = result.wu;
+              // clear fetched instruction
               state->if_id.instr = NOP;
             }      
             break;
@@ -425,7 +440,7 @@ decode(state_t *state) {
       // Perform the operation for branch instructions
       switch (op_info->operation) {
         case OPERATION_JAL:
-          op1_value.w = state->pc;
+          op1_value.w = state->if_id.pc;
           op1.integer = op1_value;
 
           op2_value.w = FIELD_OFFSET(state->if_id.instr);
@@ -436,14 +451,16 @@ decode(state_t *state) {
         case OPERATION_JALR:
           break;
         case OPERATION_BEQ: case OPERATION_BNE:
-          op1_value.w = state->pc;
+          op1_value.w = state->if_id.pc;
           op1.integer = op1_value;
 
           // not sure if signed
-          op2_value.w = FIELD_IMM_I(state->if_id.instr);
+          op2_value.w = FIELD_IMM_S(state->if_id.instr);
           op2.integer = op2_value;
 
           result = perform_operation(state->if_id.instr, state->if_id.pc, op1, op2);
+          // printf("op1: %d, op2: %d\n", op1.integer.w, op2.integer.w);
+          // printf("result: %d\n", result.integer.w);
           break;
       }
       // Check for FU structural hazard
