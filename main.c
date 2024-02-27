@@ -50,15 +50,26 @@ main(int argc, char *argv[]) {
   fclose(fu_file);
 
   /* main sim loop */
-  for (i = 0, num_insn = 0; simulate; i++) {
+  for (i = 0, num_insn = 0; TRUE; i++) {
 
     printf("\n\n*** CYCLE %d\n", i);
     print_state(state, data_count);
 
+    if (state->halt && state->int_wb.instr == 0 && state->fp_wb.instr == 0) {
+      if (fu_fp_done(state->fu_add_list) && 
+          fu_fp_done(state->fu_mult_list) && 
+          fu_fp_done(state->fu_div_list) && 
+          fu_int_done(state->fu_int_list)) {
+        
+        num_insn++;
+        break;
+      }    
+    }
+
     writeback(state, &num_insn);
     execute(state);
     if (!(state->fetch_lock)) {
-      decode(state, &simulate);
+      decode(state);
       fetch(state);
     }
   }

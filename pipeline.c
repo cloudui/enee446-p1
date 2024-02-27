@@ -28,6 +28,8 @@ writeback(state_t *state, int *num_insn) {
   int use_imm;
 
   const op_info_t *op_info = decode_instr(int_wb.instr, &use_imm);
+  // printf("Number of instructions: %d\n", *num_insn);
+
   if (int_wb.instr != 0 && int_wb.instr != NOP) {
     int_t dest_addr;
     // load store value
@@ -161,7 +163,7 @@ execute(state_t *state) {
 
 
 int
-decode(state_t *state, int *simulate) {
+decode(state_t *state) {
   int i;
   int use_imm;
   const op_info_t *op_info = decode_instr(state->if_id.instr, &use_imm);
@@ -390,12 +392,9 @@ decode(state_t *state, int *simulate) {
 
       break;
     case FU_GROUP_HALT:
-      if (!fu_fp_done(state->fu_add_list) || !fu_fp_done(state->fu_mult_list) || 
-          !fu_fp_done(state->fu_div_list) || !fu_int_done(state->fu_int_list)) {
-        state->pc -= 4;
-        return 0;
-      } 
-      *simulate = FALSE;
+      // printf("FU INT DONE: %d\n", fu_int_done(state->fu_int_list));
+      state->fetch_lock = TRUE;
+      state->halt = TRUE;
       break;
     case FU_GROUP_NONE: case FU_GROUP_INVALID:
       return -1;

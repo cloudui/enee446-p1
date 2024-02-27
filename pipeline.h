@@ -52,11 +52,12 @@ typedef struct _state_t {
   int scoreboard_fp[NUMREGS];
 
   int fetch_lock;
+  int halt;
 } state_t;
 
 extern state_t *state_create(int *, FILE *, FILE *);
 
 extern void writeback(state_t *, int *);
 extern void execute(state_t *);
-extern int decode(state_t *, int *);
+extern int decode(state_t *);
 extern void fetch(state_t *);

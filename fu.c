@@ -395,6 +395,8 @@ state_create(int *data_count, FILE *bin_file, FILE *fu_file) {
     state->scoreboard_fp[i] = -1;
   }
 
+  state->halt = FALSE;
+
   return state;
 }
 
